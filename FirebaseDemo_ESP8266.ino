@@ -1,13 +1,3 @@
-/**
- * Created by K. Suwatchai (Mobizt)
- * 
- * Email: k_suwatchai@hotmail.com
- * 
- * Github: https://github.com/mobizt
- * 
- * Copyright (c) 2021 mobizt
- *
-*/
 #include <FirebaseESP8266.h>
 #include <ESP8266WiFi.h>
 
@@ -26,10 +16,11 @@ FirebaseData fbdo;
 
 const int trig = 13;
 const int echo = 15;
+const int speaker = 12;
+
 unsigned long duration; //biến đo thời gian
 int distance;           // biến đo khoảng cách
 unsigned long sendDataPrevMillis = 0;
-
 String path = "/IoT/Stream";
 
 void printResult(FirebaseData &data);
@@ -41,6 +32,7 @@ void setup()
   
   pinMode(trig, OUTPUT); // chân trig sẽ phát tín hiệu
   pinMode(echo, INPUT);  // chân echo sẽ thu tín hiệu
+  pinMode(speaker, OUTPUT);
   
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   Serial.print("Connecting to Wi-Fi");
@@ -81,7 +73,7 @@ void loop()
   if (millis() - sendDataPrevMillis > 1000)
   {
     sendDataPrevMillis = millis();
-
+    // Implement for sonic sensor
     // Phát xung từ chân trig
     digitalWrite(trig, 0); // tắt chân trig
     delayMicroseconds(2);
@@ -94,13 +86,28 @@ void loop()
     duration = pulseIn(echo, HIGH);        // đo độ rộng xung HIGH ở chân echo
     distance = int(duration / 29.412 / 2); // tính khoảng cách đến vật
   
-    // In kết quả ra Serial monitor
-//    Serial.print(distance);
-//    Serial.println("cm");
-
-    Serial.println("------------------------------------");
+    // Get range value (warning distance from firebase)
+    String distanceWarn = "";
+    if (Firebase.getString(fbdo, path + "/Range/distanceVal"))
+    {
+      Serial.println("GET Range value -------------------------");
+      Serial.println("PASSED");
+      Serial.print("VALUE: ");
+      distanceWarn = fbdo.stringData();
+      Serial.println(distanceWarn);
+    }
+    else
+    {
+      Serial.println("FAILED");
+      Serial.println("REASON: " + fbdo.errorReason());
+      Serial.println("------------------------------------");
+      Serial.println();
+    }
+    
+    // Set distance value from sensor to firebase
     if (Firebase.setString(fbdo, path + "/Data", String(distance)))
     {
+      Serial.println("SET Distance value -------------------------");
       Serial.println("PASSED");
       Serial.print("VALUE: ");
       printResult(fbdo);
@@ -113,6 +120,18 @@ void loop()
       Serial.println("REASON: " + fbdo.errorReason());
       Serial.println("------------------------------------");
       Serial.println();
+    }
+
+    if(distance < distanceWarn.toInt() )
+    {
+      //digitalWrite(led1Pin, HIGH);
+      digitalWrite(speaker, 0);
+      //strcpy(ledStatus, "ON");
+    }
+    else
+    {
+        //digitalWrite(led1Pin, 0);
+        digitalWrite(speaker, 1);
     }
 
   }
